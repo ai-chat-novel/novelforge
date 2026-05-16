@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NovelForge — AI Novel Writer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Tab Navigation -->
+        <nav class="tab-bar">
+            <button class="tab active" data-tab="novel" onclick="app.switchTab('novel')">
+                <span class="tab-icon">✍️</span><span class="tab-label">Novel</span>
+            </button>
+            <button class="tab" data-tab="world" onclick="app.switchTab('world')">
+                <span class="tab-icon">🌍</span><span class="tab-label">World</span>
+            </button>
+            <button class="tab" data-tab="summary" onclick="app.switchTab('summary')">
+                <span class="tab-icon">📋</span><span class="tab-label">Context</span>
+            </button>
+            <button class="tab" data-tab="settings" onclick="app.switchTab('settings')">
+                <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span>
+            </button>
+        </nav>
+
+        <!-- ============ NOVEL TAB ============ -->
+        <div id="tab-novel" class="tab-content active">
+            <div class="novel-container">
+                <!-- Novel Output -->
+                <div id="novelOutput" class="novel-output">
+                    <div class="novel-empty">
+                        <div class="empty-icon">📖</div>
+                        <h3>Your Novel Starts Here</h3>
+                        <p>Set up your world in the 🌍 World tab, then come back and start writing!</p>
+                    </div>
+                </div>
+
+                <!-- Generation Controls -->
+                <div class="novel-controls">
+                    <div id="genStatus" class="gen-status hidden">
+                        <div class="gen-spinner"></div>
+                        <span id="genStatusText">Generating...</span>
+                    </div>
+                    <div class="controls-row">
+                        <textarea id="sceneInput" class="scene-input" placeholder="Scene direction (optional)... e.g. 'Mandy discovers the hidden library' or just leave empty to continue" rows="2"></textarea>
+                    </div>
+                    <div class="controls-row buttons-row">
+                        <button id="btnContinue" class="btn btn-primary" onclick="app.generate('continue')">
+                            ▶ Continue
+                        </button>
+                        <button id="btnScene" class="btn btn-secondary" onclick="app.generate('scene')">
+                            🎬 Direct Scene
+                        </button>
+                        <button class="btn btn-ghost" onclick="app.undoLast()">
+                            ↩ Undo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ WORLD TAB ============ -->
+        <div id="tab-world" class="tab-content">
+            <div class="panel-scroll">
+                <div class="panel-header">
+                    <h2>🌍 World Builder</h2>
+                    <p class="panel-desc">Define your world once. This context is ALWAYS sent to the AI.</p>
+                </div>
+
+                <div class="form-group">
+                    <label>📝 Characters</label>
+                    <p class="field-hint">Define all characters with appearance, personality, relationships.</p>
+                    <textarea id="worldCharacters" class="input-area" rows="8" placeholder="Mandy — 18, white hair, golden eyes, quiet but fierce. Transfer student at the Academy.&#10;&#10;Kael — 19, dark hair, silver eyes, top student. Rivals with Mandy but secretly protective.&#10;&#10;Professor Vex — 40s, stern, teaches Combat Arts. Has a mysterious past..."
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>🏰 World & Setting</label>
+                    <p class="field-hint">The world rules, locations, magic system, academy structure.</p>
+                    <textarea id="worldSetting" class="input-area" rows="8" placeholder="Arcane Academy — Elite school for gifted students. 8 years of study across 4 tiers.&#10;&#10;Magic System — Elemental affinity discovered at age 12. Rare dual-affinity users exist.&#10;&#10;Setting — Medieval fantasy with some modern elements. Academy is on a floating island..."
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>✒️ Writing Style</label>
+                    <p class="field-hint">Pacing, perspective, tone, what to include/avoid.</p>
+                    <textarea id="worldStyle" class="input-area" rows="6" placeholder="Write in 3rd person limited (Mandy's POV). Slow paced, rich descriptions.&#10;&#10;Include: inner thoughts, sensory details, dialogue with personality.&#10;Avoid: rushing plot, info dumps, breaking character.&#10;&#10;Spicy scenes should be detailed and tasteful. Don't skip or fade to black."
+                    ></textarea>
+                </div>
+
+                <button class="btn btn-primary btn-full" onclick="app.saveWorld()">
+                    💾 Save World
+                </button>
+            </div>
+        </div>
+
+        <!-- ============ SUMMARY/CONTEXT TAB ============ -->
+        <div id="tab-summary" class="tab-content">
+            <div class="panel-scroll">
+                <div class="panel-header">
+                    <h2>📋 Rolling Context</h2>
+                    <p class="panel-desc">Auto-generated summary of your story so far. Edit if needed.</p>
+                </div>
+
+                <div class="context-stats">
+                    <div class="stat-pill">
+                        <span class="pill-label">Novel Length</span>
+                        <span class="pill-value" id="statNovelWords">0 words</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="pill-label">Chapters</span>
+                        <span class="pill-value" id="statChapters">0</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="pill-label">Context Size</span>
+                        <span class="pill-value" id="statContext">~0 tokens</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>📖 Story Summary (auto-updated)</label>
+                    <p class="field-hint">This gets sent as context so the AI remembers what happened.</p>
+                    <textarea id="rollingSummary" class="input-area" rows="10" placeholder="Summary will appear here as you write..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>🔍 What AI Sees Each Call</label>
+                    <p class="field-hint">Preview of the full context being sent.</p>
+                    <button class="btn btn-ghost btn-full" onclick="app.previewContext()">👁️ Preview Full Context</button>
+                    <div id="contextPreview" class="context-preview hidden"></div>
+                </div>
+
+                <button class="btn btn-secondary btn-full" onclick="app.saveSummary()">
+                    💾 Save Summary Edits
+                </button>
+            </div>
+        </div>
+
+        <!-- ============ SETTINGS TAB ============ -->
+        <div id="tab-settings" class="tab-content">
+            <div class="panel-scroll">
+                <div class="panel-header">
+                    <h2>⚙️ Settings</h2>
+                    <p class="panel-desc">API configuration and system prompts.</p>
+                </div>
+
+                <div class="form-group">
+                    <label>🔑 OpenRouter API Key</label>
+                    <input type="password" id="apiKey" class="input-field" placeholder="sk-or-v1-xxxxxxxxxxxx">
+                </div>
+
+                <div class="form-group">
+                    <label>🤖 Model</label>
+                    <select id="modelSelect" class="input-field">
+                        <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 (Free)</option>
+                        <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</option>
+                        <option value="deepseek/deepseek-chat" selected>DeepSeek V4 (Paid)</option>
+                        <option value="google/gemini-2.5-flash-preview">Gemini 2.5 Flash</option>
+                        <option value="google/gemini-2.5-pro-preview">Gemini 2.5 Pro</option>
+                        <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+                        <option value="custom">Custom (type below)</option>
+                    </select>
+                    <input type="text" id="customModel" class="input-field hidden" placeholder="org/model-name">
+                </div>
+
+                <div class="form-group">
+                    <label>🔓 System Prompt / JB</label>
+                    <p class="field-hint">Your jailbreak or system instruction. Sent as the first system message.</p>
+                    <textarea id="jbPrompt" class="input-area" rows="8" placeholder="Paste your JB / system prompt here..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>📏 Max Tokens per Response</label>
+                    <input type="number" id="maxTokens" class="input-field" value="4096" min="256" max="16384">
+                </div>
+
+                <div class="form-group">
+                    <label>🌡️ Temperature</label>
+                    <input type="range" id="temperature" class="input-range" min="0" max="2" step="0.1" value="0.8">
+                    <span id="tempValue" class="range-value">0.8</span>
+                </div>
+
+                <button class="btn btn-primary btn-full" onclick="app.saveSettings()">
+                    💾 Save Settings
+                </button>
+
+                <hr class="divider">
+
+                <div class="danger-zone">
+                    <h3>📤 Export / Import</h3>
+                    <div class="controls-row buttons-row">
+                        <button class="btn btn-secondary" onclick="app.exportNovel()">📄 Export Novel (.txt)</button>
+                        <button class="btn btn-secondary" onclick="app.exportAll()">💾 Export All (JSON)</button>
+                    </div>
+                    <div class="controls-row" style="margin-top:0.5rem">
+                        <label class="btn btn-ghost btn-full" style="cursor:pointer">
+                            📂 Import Project (JSON)
+                            <input type="file" id="importFile" accept=".json" style="display:none" onchange="app.importAll(event)">
+                        </label>
+                    </div>
+
+                    <hr class="divider">
+                    <h3>⚠️ Danger Zone</h3>
+                    <button class="btn btn-danger btn-full" onclick="app.clearNovel()">🗑️ Clear Novel (keep world)</button>
+                    <button class="btn btn-danger btn-full" style="margin-top:0.5rem" onclick="app.clearAll()">💣 Reset Everything</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
