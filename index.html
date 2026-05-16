@@ -155,9 +155,12 @@
                 <div class="form-group">
                     <label>🤖 Model</label>
                     <select id="modelSelect" class="input-field">
-                        <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 (Free)</option>
+                        <option value="deepseek/deepseek-v4-flash:free" selected>⭐ DeepSeek V4 Flash (Free)</option>
+                        <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash (Paid)</option>
+                        <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro (Paid)</option>
+                        <option value="deepseek/deepseek-chat">DeepSeek V3 (Legacy)</option>
+                        <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 Free (Legacy)</option>
                         <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</option>
-                        <option value="deepseek/deepseek-chat" selected>DeepSeek V4 (Paid)</option>
                         <option value="google/gemini-2.5-flash-preview">Gemini 2.5 Flash</option>
                         <option value="google/gemini-2.5-pro-preview">Gemini 2.5 Pro</option>
                         <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
@@ -174,7 +177,7 @@
 
                 <div class="form-group">
                     <label>📏 Max Tokens per Response</label>
-                    <input type="number" id="maxTokens" class="input-field" value="4096" min="256" max="16384">
+                    <input type="number" id="maxTokens" class="input-field" value="8192" min="256" max="16384">
                 </div>
 
                 <div class="form-group">

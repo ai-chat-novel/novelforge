@@ -13,10 +13,10 @@ class NovelApp {
     defaults() {
         return {
             apiKey: '',
-            model: 'deepseek/deepseek-chat',
+            model: 'deepseek/deepseek-v4-flash:free',
             customModel: '',
             jbPrompt: '',
-            maxTokens: 4096,
+            maxTokens: 8192,
             temperature: 0.8,
             characters: '',
             worldSetting: '',
@@ -127,7 +127,7 @@ class NovelApp {
         // Anti-repetition directive
         msgs.push({
             role: 'system',
-            content: `CRITICAL WRITING RULES:\n- NEVER repeat dialogue, phrases, or scenes from previous sections.\n- NEVER use the phrase "one day at a time" again.\n- NEVER reuse the same scene structure (e.g. mess hall lunch → library study → dorm sleep).\n- Each section MUST introduce NEW events, NEW conversations, NEW character dynamics.\n- Advance the plot forward. Show new classes, new interactions, new incidents.\n- If previous sections covered lunch/library/dorm, the next section must show DIFFERENT activities.\n- Vary sentence structure, dialogue, and descriptions. No templates.`
+            content: `CRITICAL WRITING RULES:\n- NEVER repeat dialogue, phrases, or scenes from previous sections.\n- NEVER use the phrase "one day at a time" again.\n- NEVER reuse the same scene structure (e.g. mess hall lunch → library study → dorm sleep).\n- Each section MUST introduce NEW events, NEW conversations, NEW character dynamics.\n- Advance the plot forward. Show new classes, new interactions, new incidents.\n- If previous sections covered lunch/library/dorm, the next section must show DIFFERENT activities.\n- Vary sentence structure, dialogue, and descriptions. No templates.\n- NEVER add "Notes for Continuity" or meta-commentary. You are writing the novel, not commenting on it.\n- NEVER say "Let me know if you'd like to adjust" — just write the story.\n- Sex/intimate scenes: Write with full anatomical detail using explicit words (cock, pussy, nipple, clit, etc). Never use euphemisms like "her entrance" or "his length". Describe physical sensations, fluids, skin contact, body reactions realistically. Never fade to black or skip over details.`
         });
 
         if (this.data.rollingSummary.trim()) {
