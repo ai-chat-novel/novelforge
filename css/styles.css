@@ -120,7 +120,9 @@ body {
     animation: fadeIn 0.5s ease;
 }
 .novel-section:last-child { border-bottom: none; }
-.novel-section p { margin-bottom: 0.75rem; }
+.novel-section p { margin-bottom: 0.75rem; line-height: 1.9; }
+.novel-section p strong { color: #c4b5fd; font-weight: 700; }
+.novel-section hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 .novel-section .section-meta {
     font-family: var(--font);
     font-size: 0.65rem; font-weight: 600;

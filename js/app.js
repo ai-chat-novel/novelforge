@@ -124,6 +124,12 @@ class NovelApp {
             });
         }
 
+        // Anti-repetition directive
+        msgs.push({
+            role: 'system',
+            content: `CRITICAL WRITING RULES:\n- NEVER repeat dialogue, phrases, or scenes from previous sections.\n- NEVER use the phrase "one day at a time" again.\n- NEVER reuse the same scene structure (e.g. mess hall lunch → library study → dorm sleep).\n- Each section MUST introduce NEW events, NEW conversations, NEW character dynamics.\n- Advance the plot forward. Show new classes, new interactions, new incidents.\n- If previous sections covered lunch/library/dorm, the next section must show DIFFERENT activities.\n- Vary sentence structure, dialogue, and descriptions. No templates.`
+        });
+
         if (this.data.rollingSummary.trim()) {
             msgs.push({
                 role: 'system',
@@ -131,12 +137,18 @@ class NovelApp {
             });
         }
 
+        // Recent sections — truncate each to ~2000 chars to save context
         const recent = this.data.novelSections.slice(-2);
         if (recent.length > 0) {
             let recentText = recent.map(s => {
                 let block = '';
                 if (s.direction) block += `[Scene direction: ${s.direction}]\n`;
-                block += s.text;
+                let text = s.text;
+                // Truncate long sections — keep last 2000 chars
+                if (text.length > 2000) {
+                    text = '... [earlier content truncated] ...\n\n' + text.slice(-2000);
+                }
+                block += text;
                 return block;
             }).join('\n\n---\n\n');
 
@@ -160,15 +172,17 @@ class NovelApp {
         let userMsg;
 
         if (mode === 'scene' && sceneInput) {
-            userMsg = `Continue the novel. Here is the scene direction: ${sceneInput}\n\nWrite the next section following this direction. Stay in character and maintain the established writing style.`;
+            userMsg = `Continue the novel. Here is the scene direction: ${sceneInput}\n\nWrite the next section following this direction. Stay in character and maintain the established writing style. DO NOT repeat any previous scenes or dialogue.`;
         } else if (this.data.novelSections.length === 0) {
             userMsg = sceneInput
                 ? `Begin the novel with this scene: ${sceneInput}\n\nWrite the opening section.`
                 : 'Begin the novel. Write the opening section — Day 1.';
         } else {
+            // Smarter continue prompt that pushes plot forward
+            const sectionCount = this.data.novelSections.length;
             userMsg = sceneInput
-                ? `Continue the novel. Direction: ${sceneInput}`
-                : 'Continue the novel from where we left off. Write the next section naturally.';
+                ? `Continue the novel. Direction: ${sceneInput}\n\nDo NOT repeat any previous scenes. Introduce new events and conversations.`
+                : `Continue the novel from where we left off. This is section ${sectionCount + 1}.\n\nIMPORTANT: Write a COMPLETELY NEW scene that has NOT appeared before. Advance the plot. Introduce a new event, a new conversation topic, or a new character interaction. DO NOT reuse any dialogue or scene structure from previous sections. Show something the reader hasn't seen yet.`;
         }
 
         const messages = this.buildMessages(userMsg);
@@ -280,6 +294,18 @@ class NovelApp {
     }
 
     /* ---------- RENDER NOVEL ---------- */
+    parseMd(text) {
+        // Parse markdown: **bold**, *italic*, escape HTML first
+        let safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Bold: **text**
+        safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Italic: *text*
+        safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        // Horizontal rules: --- or ***
+        safe = safe.replace(/^(---|\*\*\*)$/gm, '<hr>');
+        return safe;
+    }
+
     renderNovel() {
         const output = document.getElementById('novelOutput');
         if (this.data.novelSections.length === 0) {
@@ -294,7 +320,7 @@ class NovelApp {
         output.innerHTML = this.data.novelSections.map((s, i) => {
             const dir = s.direction ? `<div class="section-direction">🎬 ${s.direction}</div>` : '';
             const meta = `<div class="section-meta">Section ${i + 1}</div>`;
-            const text = s.text.split('\n').filter(p => p.trim()).map(p => `<p>${p}</p>`).join('');
+            const text = s.text.split('\n').filter(p => p.trim()).map(p => `<p>${this.parseMd(p)}</p>`).join('');
             return `<div class="novel-section">${meta}${dir}${text}</div>`;
         }).join('');
 
