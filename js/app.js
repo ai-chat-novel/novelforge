@@ -12,7 +12,9 @@ class NovelApp {
     /* ---------- STORAGE ---------- */
     defaults() {
         return {
+            provider: 'openrouter',
             apiKey: '',
+            apiKeyNvidia: '',
             model: 'deepseek/deepseek-v4-flash:free',
             customModel: '',
             jbPrompt: '',
@@ -39,7 +41,9 @@ class NovelApp {
 
     /* ---------- INIT ---------- */
     init() {
-        document.getElementById('apiKey').value = this.data.apiKey;
+        // Provider toggle
+        this.switchProvider(this.data.provider, true);
+
         document.getElementById('modelSelect').value = this.data.model;
         document.getElementById('customModel').value = this.data.customModel;
         document.getElementById('jbPrompt').value = this.data.jbPrompt;
@@ -70,6 +74,39 @@ class NovelApp {
         });
     }
 
+    /* ---------- PROVIDER TOGGLE ---------- */
+    switchProvider(provider, silent) {
+        this.data.provider = provider;
+        const isNvidia = provider === 'nvidia';
+
+        // Toggle button styles
+        document.getElementById('provOpenRouter').classList.toggle('active', !isNvidia);
+        document.getElementById('provNvidia').classList.toggle('active', isNvidia);
+
+        // Update API key field
+        const keyField = document.getElementById('apiKey');
+        const keyLabel = document.getElementById('apiKeyLabel');
+        if (isNvidia) {
+            keyLabel.textContent = '🔑 NVIDIA API Key';
+            keyField.placeholder = 'nvapi-xxxxxxxxxxxx';
+            keyField.value = this.data.apiKeyNvidia;
+        } else {
+            keyLabel.textContent = '🔑 OpenRouter API Key';
+            keyField.placeholder = 'sk-or-v1-xxxxxxxxxxxx';
+            keyField.value = this.data.apiKey;
+        }
+
+        // Toggle model optgroups
+        document.getElementById('ogOpenRouter').classList.toggle('hidden', isNvidia);
+        document.getElementById('ogNvidia').classList.toggle('hidden', !isNvidia);
+
+        // Auto-select first model of the active provider
+        if (!silent) {
+            const firstOption = document.querySelector(`#${isNvidia ? 'ogNvidia' : 'ogOpenRouter'} option`);
+            if (firstOption) document.getElementById('modelSelect').value = firstOption.value;
+        }
+    }
+
     /* ---------- TABS ---------- */
     switchTab(tabId) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -80,11 +117,17 @@ class NovelApp {
 
     /* ---------- SAVE HANDLERS ---------- */
     saveSettings() {
-        this.data.apiKey = document.getElementById('apiKey').value.trim();
+        const isNvidia = this.data.provider === 'nvidia';
+        const keyVal = document.getElementById('apiKey').value.trim();
+        if (isNvidia) {
+            this.data.apiKeyNvidia = keyVal;
+        } else {
+            this.data.apiKey = keyVal;
+        }
         this.data.model = document.getElementById('modelSelect').value;
         this.data.customModel = document.getElementById('customModel').value.trim();
         this.data.jbPrompt = document.getElementById('jbPrompt').value;
-        this.data.maxTokens = parseInt(document.getElementById('maxTokens').value) || 4096;
+        this.data.maxTokens = parseInt(document.getElementById('maxTokens').value) || 8192;
         this.data.temperature = parseFloat(document.getElementById('temperature').value) || 0.8;
         this.save();
         this.toast('Settings saved ✓');
@@ -162,7 +205,8 @@ class NovelApp {
     /* ---------- GENERATION ---------- */
     async generate(mode) {
         if (this.generating) return;
-        if (!this.data.apiKey) {
+        const activeKey = this.data.provider === 'nvidia' ? this.data.apiKeyNvidia : this.data.apiKey;
+        if (!activeKey) {
             this.toast('Set your API key in ⚙️ Settings!');
             this.switchTab('settings');
             return;
@@ -225,25 +269,41 @@ class NovelApp {
     }
 
     async callAPI(messages, model) {
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const isNvidia = this.data.provider === 'nvidia';
+        const baseUrl = isNvidia
+            ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+            : 'https://openrouter.ai/api/v1/chat/completions';
+        const apiKey = isNvidia ? this.data.apiKeyNvidia : this.data.apiKey;
+
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        };
+        if (!isNvidia) {
+            headers['HTTP-Referer'] = window.location.href;
+            headers['X-Title'] = 'NovelForge';
+        }
+
+        const bodyObj = {
+            model: model,
+            messages: messages,
+            max_tokens: this.data.maxTokens,
+            temperature: this.data.temperature,
+        };
+        // NVIDIA NIM: disable thinking mode for creative writing
+        if (isNvidia) {
+            bodyObj.chat_template_kwargs = { thinking: false };
+        }
+
+        const res = await fetch(baseUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.data.apiKey}`,
-                'HTTP-Referer': window.location.href,
-                'X-Title': 'NovelForge'
-            },
-            body: JSON.stringify({
-                model: model,
-                messages: messages,
-                max_tokens: this.data.maxTokens,
-                temperature: this.data.temperature,
-            })
+            headers: headers,
+            body: JSON.stringify(bodyObj)
         });
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error?.message || `API Error ${res.status}`);
+            throw new Error(err.error?.message || err.detail || `API Error ${res.status}`);
         }
 
         const data = await res.json();

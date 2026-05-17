@@ -235,7 +235,26 @@ body {
 .input-area { resize: vertical; min-height: 80px; line-height: 1.5; }
 .input-area::placeholder, .input-field::placeholder { color: var(--text3); }
 select.input-field { cursor: pointer; }
+select.input-field optgroup.hidden { display: none; }
 .input-range { width: 100%; margin-top: 0.3rem; accent-color: var(--accent); }
+
+/* Provider toggle */
+.provider-toggle {
+    display: flex; gap: 0; border-radius: var(--radius-sm); overflow: hidden;
+    border: 1px solid var(--border);
+}
+.provider-btn {
+    flex: 1; padding: 0.55rem 0.75rem;
+    font-family: var(--font); font-size: 0.82rem; font-weight: 600;
+    color: var(--text3); background: var(--bg);
+    border: none; cursor: pointer;
+    transition: all 0.2s;
+}
+.provider-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.provider-btn:hover { color: var(--text2); background: var(--bg2); }
+.provider-btn.active {
+    color: white; background: linear-gradient(135deg, var(--accent2), var(--accent));
+}
 .range-value {
     font-size: 0.75rem; font-weight: 700; color: var(--accent);
     float: right; margin-top: -1.5rem;
