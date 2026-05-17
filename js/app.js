@@ -237,7 +237,7 @@ class NovelApp {
                 model: model,
                 messages: messages,
                 max_tokens: this.data.maxTokens,
-                temperature: this.data.temperature
+                temperature: this.data.temperature,
             })
         });
 
@@ -247,14 +247,7 @@ class NovelApp {
         }
 
         const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || '';
-
-        // If content is empty or garbage (reasoning-only response), throw
-        if (!content || content.trim().length < 50) {
-            throw new Error('Empty or invalid response from provider. Try again.');
-        }
-
-        return content;
+        return data.choices?.[0]?.message?.content || '';
     }
 
     /* ---------- AUTO-SAVE RESPONSE TO FILE ---------- */
@@ -279,7 +272,7 @@ class NovelApp {
             const summaryPrompt = [
                 {
                     role: 'system',
-                    content: 'You are a concise summarizer. Summarize the following novel section in 3-5 sentences. Focus on: key events, character actions, emotional beats, and any plot developments. Be factual and brief. Do NOT add meta-commentary.'
+                    content: 'You are a concise summarizer. Summarize the following novel section in 3-5 sentences. Focus on: key events, character actions, emotional beats, and any plot developments. Be factual and brief.'
                 },
                 {
                     role: 'user',
@@ -290,10 +283,7 @@ class NovelApp {
             const summary = await this.callAPI(summaryPrompt, model);
             if (summary) {
                 const sectionNum = this.data.novelSections.length;
-                // Extract Day number from the generated text
-                const dayMatch = newText.match(/\*\*?Day\s+(\d+)\*\*?/i) || newText.match(/Day\s+(\d+)/i);
-                const dayTag = dayMatch ? `Day ${dayMatch[1]} - ` : '';
-                const newEntry = `\n\n[Section ${sectionNum}] ${dayTag}${summary.trim()}`;
+                const newEntry = `\n\n[Section ${sectionNum}] ${summary.trim()}`;
                 this.data.rollingSummary = (this.data.rollingSummary + newEntry).trim();
                 document.getElementById('rollingSummary').value = this.data.rollingSummary;
                 this.save();
