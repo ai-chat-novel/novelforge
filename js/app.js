@@ -15,6 +15,7 @@ class NovelApp {
             provider: 'openrouter',
             apiKey: '',
             apiKeyNvidia: '',
+            proxyUrl: '',
             model: 'deepseek/deepseek-v4-flash:free',
             customModel: '',
             jbPrompt: '',
@@ -100,6 +101,12 @@ class NovelApp {
         document.getElementById('ogOpenRouter').classList.toggle('hidden', isNvidia);
         document.getElementById('ogNvidia').classList.toggle('hidden', !isNvidia);
 
+        // Show/hide proxy URL field
+        document.getElementById('proxyUrlGroup').classList.toggle('hidden', !isNvidia);
+        if (isNvidia) {
+            document.getElementById('proxyUrl').value = this.data.proxyUrl;
+        }
+
         // Auto-select first model of the active provider
         if (!silent) {
             const firstOption = document.querySelector(`#${isNvidia ? 'ogNvidia' : 'ogOpenRouter'} option`);
@@ -121,6 +128,7 @@ class NovelApp {
         const keyVal = document.getElementById('apiKey').value.trim();
         if (isNvidia) {
             this.data.apiKeyNvidia = keyVal;
+            this.data.proxyUrl = document.getElementById('proxyUrl').value.trim();
         } else {
             this.data.apiKey = keyVal;
         }
@@ -270,8 +278,9 @@ class NovelApp {
 
     async callAPI(messages, model) {
         const isNvidia = this.data.provider === 'nvidia';
+        // NVIDIA: use remote proxy URL if set, else local proxy
         const baseUrl = isNvidia
-            ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+            ? (this.data.proxyUrl || '/proxy/nvidia')
             : 'https://openrouter.ai/api/v1/chat/completions';
         const apiKey = isNvidia ? this.data.apiKeyNvidia : this.data.apiKey;
 

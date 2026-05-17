@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NovelForge — AI Novel Writer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
     <div class="app">
         <!-- Tab Navigation -->
@@ -45,7 +49,9 @@
                         <span id="genStatusText">Generating...</span>
                     </div>
                     <div class="controls-row">
-                        <textarea id="sceneInput" class="scene-input" placeholder="Scene direction (optional)... e.g. 'Mandy discovers the hidden library' or just leave empty to continue" rows="2"></textarea>
+                        <textarea id="sceneInput" class="scene-input"
+                            placeholder="Scene direction (optional)... e.g. 'Mandy discovers the hidden library' or just leave empty to continue"
+                            rows="2"></textarea>
                     </div>
                     <div class="controls-row buttons-row">
                         <button id="btnContinue" class="btn btn-primary" onclick="app.generate('continue')">
@@ -73,22 +79,22 @@
                 <div class="form-group">
                     <label>📝 Characters</label>
                     <p class="field-hint">Define all characters with appearance, personality, relationships.</p>
-                    <textarea id="worldCharacters" class="input-area" rows="8" placeholder="Mandy — 18, white hair, golden eyes, quiet but fierce. Transfer student at the Academy.&#10;&#10;Kael — 19, dark hair, silver eyes, top student. Rivals with Mandy but secretly protective.&#10;&#10;Professor Vex — 40s, stern, teaches Combat Arts. Has a mysterious past..."
-                    ></textarea>
+                    <textarea id="worldCharacters" class="input-area" rows="8"
+                        placeholder="Mandy — 18, white hair, golden eyes, quiet but fierce. Transfer student at the Academy.&#10;&#10;Kael — 19, dark hair, silver eyes, top student. Rivals with Mandy but secretly protective.&#10;&#10;Professor Vex — 40s, stern, teaches Combat Arts. Has a mysterious past..."></textarea>
                 </div>
 
                 <div class="form-group">
                     <label>🏰 World & Setting</label>
                     <p class="field-hint">The world rules, locations, magic system, academy structure.</p>
-                    <textarea id="worldSetting" class="input-area" rows="8" placeholder="Arcane Academy — Elite school for gifted students. 8 years of study across 4 tiers.&#10;&#10;Magic System — Elemental affinity discovered at age 12. Rare dual-affinity users exist.&#10;&#10;Setting — Medieval fantasy with some modern elements. Academy is on a floating island..."
-                    ></textarea>
+                    <textarea id="worldSetting" class="input-area" rows="8"
+                        placeholder="Arcane Academy — Elite school for gifted students. 8 years of study across 4 tiers.&#10;&#10;Magic System — Elemental affinity discovered at age 12. Rare dual-affinity users exist.&#10;&#10;Setting — Medieval fantasy with some modern elements. Academy is on a floating island..."></textarea>
                 </div>
 
                 <div class="form-group">
                     <label>✒️ Writing Style</label>
                     <p class="field-hint">Pacing, perspective, tone, what to include/avoid.</p>
-                    <textarea id="worldStyle" class="input-area" rows="6" placeholder="Write in 3rd person limited (Mandy's POV). Slow paced, rich descriptions.&#10;&#10;Include: inner thoughts, sensory details, dialogue with personality.&#10;Avoid: rushing plot, info dumps, breaking character.&#10;&#10;Spicy scenes should be detailed and tasteful. Don't skip or fade to black."
-                    ></textarea>
+                    <textarea id="worldStyle" class="input-area" rows="6"
+                        placeholder="Write in 3rd person limited (Mandy's POV). Slow paced, rich descriptions.&#10;&#10;Include: inner thoughts, sensory details, dialogue with personality.&#10;Avoid: rushing plot, info dumps, breaking character.&#10;&#10;Spicy scenes should be detailed and tasteful. Don't skip or fade to black."></textarea>
                 </div>
 
                 <button class="btn btn-primary btn-full" onclick="app.saveWorld()">
@@ -123,13 +129,15 @@
                 <div class="form-group">
                     <label>📖 Story Summary (auto-updated)</label>
                     <p class="field-hint">This gets sent as context so the AI remembers what happened.</p>
-                    <textarea id="rollingSummary" class="input-area" rows="10" placeholder="Summary will appear here as you write..."></textarea>
+                    <textarea id="rollingSummary" class="input-area" rows="10"
+                        placeholder="Summary will appear here as you write..."></textarea>
                 </div>
 
                 <div class="form-group">
                     <label>🔍 What AI Sees Each Call</label>
                     <p class="field-hint">Preview of the full context being sent.</p>
-                    <button class="btn btn-ghost btn-full" onclick="app.previewContext()">👁️ Preview Full Context</button>
+                    <button class="btn btn-ghost btn-full" onclick="app.previewContext()">👁️ Preview Full
+                        Context</button>
                     <div id="contextPreview" class="context-preview hidden"></div>
                 </div>
 
@@ -150,14 +158,24 @@
                 <div class="form-group">
                     <label>🌐 API Provider</label>
                     <div class="provider-toggle">
-                        <button id="provOpenRouter" class="provider-btn active" onclick="app.switchProvider('openrouter')">OpenRouter</button>
-                        <button id="provNvidia" class="provider-btn" onclick="app.switchProvider('nvidia')">NVIDIA NIM</button>
+                        <button id="provOpenRouter" class="provider-btn active"
+                            onclick="app.switchProvider('openrouter')">OpenRouter</button>
+                        <button id="provNvidia" class="provider-btn" onclick="app.switchProvider('nvidia')">NVIDIA
+                            NIM</button>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label id="apiKeyLabel">🔑 OpenRouter API Key</label>
                     <input type="password" id="apiKey" class="input-field" placeholder="sk-or-v1-xxxxxxxxxxxx">
+                </div>
+
+                <div id="proxyUrlGroup" class="form-group hidden">
+                    <label>🔗 NVIDIA Proxy URL</label>
+                    <p class="field-hint">Leave empty for local proxy. For mobile without laptop, paste your Cloudflare
+                        Worker URL.</p>
+                    <input type="text" id="proxyUrl" class="input-field"
+                        placeholder="https://novelforge-proxy.YOUR_NAME.workers.dev">
                 </div>
 
                 <div class="form-group">
@@ -189,7 +207,8 @@
                 <div class="form-group">
                     <label>🔓 System Prompt / JB</label>
                     <p class="field-hint">Your jailbreak or system instruction. Sent as the first system message.</p>
-                    <textarea id="jbPrompt" class="input-area" rows="8" placeholder="Paste your JB / system prompt here..."></textarea>
+                    <textarea id="jbPrompt" class="input-area" rows="8"
+                        placeholder="Paste your JB / system prompt here..."></textarea>
                 </div>
 
                 <div class="form-group">
@@ -218,14 +237,17 @@
                     <div class="controls-row" style="margin-top:0.5rem">
                         <label class="btn btn-ghost btn-full" style="cursor:pointer">
                             📂 Import Project (JSON)
-                            <input type="file" id="importFile" accept=".json" style="display:none" onchange="app.importAll(event)">
+                            <input type="file" id="importFile" accept=".json" style="display:none"
+                                onchange="app.importAll(event)">
                         </label>
                     </div>
 
                     <hr class="divider">
                     <h3>⚠️ Danger Zone</h3>
-                    <button class="btn btn-danger btn-full" onclick="app.clearNovel()">🗑️ Clear Novel (keep world)</button>
-                    <button class="btn btn-danger btn-full" style="margin-top:0.5rem" onclick="app.clearAll()">💣 Reset Everything</button>
+                    <button class="btn btn-danger btn-full" onclick="app.clearNovel()">🗑️ Clear Novel (keep
+                        world)</button>
+                    <button class="btn btn-danger btn-full" style="margin-top:0.5rem" onclick="app.clearAll()">💣 Reset
+                        Everything</button>
                 </div>
             </div>
         </div>
@@ -233,4 +255,5 @@
 
     <script src="js/app.js"></script>
 </body>
+
 </html>
