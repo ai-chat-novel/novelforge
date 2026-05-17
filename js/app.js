@@ -237,10 +237,7 @@ class NovelApp {
                 model: model,
                 messages: messages,
                 max_tokens: this.data.maxTokens,
-                temperature: this.data.temperature,
-                provider: {
-                    ignore: ["Crucible"]
-                }
+                temperature: this.data.temperature
             })
         });
 
