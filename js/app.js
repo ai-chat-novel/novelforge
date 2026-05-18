@@ -15,7 +15,9 @@ class NovelApp {
             provider: 'openrouter',
             apiKey: '',
             apiKeyNvidia: '',
+            apiKeyCustom: '',
             proxyUrl: '',
+            customBaseUrl: '',
             model: 'deepseek/deepseek-v4-flash:free',
             customModel: '',
             jbPrompt: '',
@@ -79,10 +81,13 @@ class NovelApp {
     switchProvider(provider, silent) {
         this.data.provider = provider;
         const isNvidia = provider === 'nvidia';
+        const isCustom = provider === 'custom';
+        const isOpenRouter = provider === 'openrouter';
 
         // Toggle button styles
-        document.getElementById('provOpenRouter').classList.toggle('active', !isNvidia);
+        document.getElementById('provOpenRouter').classList.toggle('active', isOpenRouter);
         document.getElementById('provNvidia').classList.toggle('active', isNvidia);
+        document.getElementById('provCustom').classList.toggle('active', isCustom);
 
         // Update API key field
         const keyField = document.getElementById('apiKey');
@@ -91,24 +96,39 @@ class NovelApp {
             keyLabel.textContent = '🔑 NVIDIA API Key';
             keyField.placeholder = 'nvapi-xxxxxxxxxxxx';
             keyField.value = this.data.apiKeyNvidia;
+        } else if (isCustom) {
+            keyLabel.textContent = '🔑 API Key';
+            keyField.placeholder = 'your-api-key-here';
+            keyField.value = this.data.apiKeyCustom;
         } else {
             keyLabel.textContent = '🔑 OpenRouter API Key';
             keyField.placeholder = 'sk-or-v1-xxxxxxxxxxxx';
             keyField.value = this.data.apiKey;
         }
 
-        // Toggle model optgroups
-        document.getElementById('ogOpenRouter').classList.toggle('hidden', isNvidia);
-        document.getElementById('ogNvidia').classList.toggle('hidden', !isNvidia);
+        // Show/hide custom base URL field
+        document.getElementById('customBaseUrlGroup').classList.toggle('hidden', !isCustom);
+        if (isCustom) {
+            document.getElementById('customBaseUrl').value = this.data.customBaseUrl;
+        }
 
-        // Show/hide proxy URL field
+        // Show/hide proxy URL field (NVIDIA only)
         document.getElementById('proxyUrlGroup').classList.toggle('hidden', !isNvidia);
         if (isNvidia) {
             document.getElementById('proxyUrl').value = this.data.proxyUrl;
         }
 
+        // Toggle model optgroups vs custom model input
+        document.getElementById('ogOpenRouter').classList.toggle('hidden', !isOpenRouter);
+        document.getElementById('ogNvidia').classList.toggle('hidden', !isNvidia);
+        document.getElementById('modelSelect').classList.toggle('hidden', isCustom);
+        document.getElementById('customModel').classList.toggle('hidden', !isCustom);
+        if (isCustom) {
+            document.getElementById('customModel').value = this.data.customModel;
+        }
+
         // Auto-select first model of the active provider
-        if (!silent) {
+        if (!silent && !isCustom) {
             const firstOption = document.querySelector(`#${isNvidia ? 'ogNvidia' : 'ogOpenRouter'} option`);
             if (firstOption) document.getElementById('modelSelect').value = firstOption.value;
         }
@@ -124,16 +144,21 @@ class NovelApp {
 
     /* ---------- SAVE HANDLERS ---------- */
     saveSettings() {
-        const isNvidia = this.data.provider === 'nvidia';
+        const provider = this.data.provider;
         const keyVal = document.getElementById('apiKey').value.trim();
-        if (isNvidia) {
+        if (provider === 'nvidia') {
             this.data.apiKeyNvidia = keyVal;
             this.data.proxyUrl = document.getElementById('proxyUrl').value.trim();
+        } else if (provider === 'custom') {
+            this.data.apiKeyCustom = keyVal;
+            this.data.customBaseUrl = document.getElementById('customBaseUrl').value.trim();
+            this.data.customModel = document.getElementById('customModel').value.trim();
         } else {
             this.data.apiKey = keyVal;
         }
-        this.data.model = document.getElementById('modelSelect').value;
-        this.data.customModel = document.getElementById('customModel').value.trim();
+        if (provider !== 'custom') {
+            this.data.model = document.getElementById('modelSelect').value;
+        }
         this.data.jbPrompt = document.getElementById('jbPrompt').value;
         this.data.maxTokens = parseInt(document.getElementById('maxTokens').value) || 8192;
         this.data.temperature = parseFloat(document.getElementById('temperature').value) || 0.8;
@@ -213,7 +238,8 @@ class NovelApp {
     /* ---------- GENERATION ---------- */
     async generate(mode) {
         if (this.generating) return;
-        const activeKey = this.data.provider === 'nvidia' ? this.data.apiKeyNvidia : this.data.apiKey;
+        const p = this.data.provider;
+        const activeKey = p === 'nvidia' ? this.data.apiKeyNvidia : p === 'custom' ? this.data.apiKeyCustom : this.data.apiKey;
         if (!activeKey) {
             this.toast('Set your API key in ⚙️ Settings!');
             this.switchTab('settings');
@@ -277,18 +303,27 @@ class NovelApp {
     }
 
     async callAPI(messages, model) {
-        const isNvidia = this.data.provider === 'nvidia';
-        // NVIDIA: use remote proxy URL if set, else local proxy
-        const baseUrl = isNvidia
-            ? (this.data.proxyUrl || '/proxy/nvidia')
-            : 'https://openrouter.ai/api/v1/chat/completions';
-        const apiKey = isNvidia ? this.data.apiKeyNvidia : this.data.apiKey;
+        const provider = this.data.provider;
+        let baseUrl, apiKey;
+
+        if (provider === 'nvidia') {
+            baseUrl = this.data.proxyUrl || '/proxy/nvidia';
+            apiKey = this.data.apiKeyNvidia;
+        } else if (provider === 'custom') {
+            baseUrl = this.data.customBaseUrl;
+            apiKey = this.data.apiKeyCustom;
+            model = this.data.customModel || model;
+            if (!baseUrl) throw new Error('Set your Custom API Base URL in Settings!');
+        } else {
+            baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+            apiKey = this.data.apiKey;
+        }
 
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
         };
-        if (!isNvidia) {
+        if (provider === 'openrouter') {
             headers['HTTP-Referer'] = window.location.href;
             headers['X-Title'] = 'NovelForge';
         }
@@ -299,9 +334,9 @@ class NovelApp {
             max_tokens: this.data.maxTokens,
             temperature: this.data.temperature,
         };
-        // NVIDIA NIM: disable thinking mode for creative writing
-        if (isNvidia) {
-            bodyObj.chat_template_kwargs = { thinking: false };
+        // NVIDIA NIM: enable thinking to prevent timeout
+        if (provider === 'nvidia') {
+            bodyObj.chat_template_kwargs = { enable_thinking: true, thinking: true };
         }
 
         const res = await fetch(baseUrl, {
