@@ -112,9 +112,9 @@ class NovelApp {
             document.getElementById('customBaseUrl').value = this.data.customBaseUrl;
         }
 
-        // Show/hide proxy URL field (NVIDIA only)
-        document.getElementById('proxyUrlGroup').classList.toggle('hidden', !isNvidia);
-        if (isNvidia) {
+        // Show/hide proxy URL field (NVIDIA + Custom need it)
+        document.getElementById('proxyUrlGroup').classList.toggle('hidden', isOpenRouter);
+        if (!isOpenRouter) {
             document.getElementById('proxyUrl').value = this.data.proxyUrl;
         }
 
@@ -148,13 +148,16 @@ class NovelApp {
         const keyVal = document.getElementById('apiKey').value.trim();
         if (provider === 'nvidia') {
             this.data.apiKeyNvidia = keyVal;
-            this.data.proxyUrl = document.getElementById('proxyUrl').value.trim();
         } else if (provider === 'custom') {
             this.data.apiKeyCustom = keyVal;
             this.data.customBaseUrl = document.getElementById('customBaseUrl').value.trim();
             this.data.customModel = document.getElementById('customModel').value.trim();
         } else {
             this.data.apiKey = keyVal;
+        }
+        // Proxy URL shared by NVIDIA + Custom
+        if (provider !== 'openrouter') {
+            this.data.proxyUrl = document.getElementById('proxyUrl').value.trim();
         }
         if (provider !== 'custom') {
             this.data.model = document.getElementById('modelSelect').value;
@@ -304,28 +307,24 @@ class NovelApp {
 
     async callAPI(messages, model) {
         const provider = this.data.provider;
-        let baseUrl, apiKey;
+        let targetUrl, apiKey;
 
         if (provider === 'nvidia') {
-            baseUrl = this.data.proxyUrl || '/proxy/nvidia';
+            targetUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
             apiKey = this.data.apiKeyNvidia;
         } else if (provider === 'custom') {
-            baseUrl = this.data.customBaseUrl;
+            targetUrl = this.data.customBaseUrl;
             apiKey = this.data.apiKeyCustom;
             model = this.data.customModel || model;
-            if (!baseUrl) throw new Error('Set your Custom API Base URL in Settings!');
+            if (!targetUrl) throw new Error('Set your Custom API Base URL in Settings!');
+            // Ensure URL ends with /chat/completions
+            if (!targetUrl.includes('/chat/completions')) {
+                targetUrl = targetUrl.replace(/\/$/, '') + '/chat/completions';
+            }
         } else {
-            baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+            // OpenRouter — direct, no proxy needed
+            targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
             apiKey = this.data.apiKey;
-        }
-
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-        };
-        if (provider === 'openrouter') {
-            headers['HTTP-Referer'] = window.location.href;
-            headers['X-Title'] = 'NovelForge';
         }
 
         const bodyObj = {
@@ -339,7 +338,28 @@ class NovelApp {
             bodyObj.chat_template_kwargs = { enable_thinking: true, thinking: true };
         }
 
-        const res = await fetch(baseUrl, {
+        let fetchUrl, headers;
+
+        if (provider === 'openrouter') {
+            // Direct call — OpenRouter supports CORS
+            fetchUrl = targetUrl;
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': window.location.href,
+                'X-Title': 'NovelForge',
+            };
+        } else {
+            // Route through proxy (local or Cloudflare Worker)
+            fetchUrl = this.data.proxyUrl || '/proxy/nvidia';
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'X-Target-URL': targetUrl,
+            };
+        }
+
+        const res = await fetch(fetchUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(bodyObj)

@@ -1,5 +1,6 @@
-// NovelForge — NVIDIA NIM Proxy (Cloudflare Worker)
-// Deploy: npx wrangler deploy
+// NovelForge — Universal API Proxy (Cloudflare Worker)
+// Proxies any OpenAI-compatible API to bypass CORS
+// Deploy: cd cf-worker && npx wrangler deploy
 // Free tier: 100K requests/day
 
 export default {
@@ -11,34 +12,53 @@ export default {
                 headers: {
                     'Access-Control-Allow-Origin': '*',
                     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Target-URL',
                     'Access-Control-Max-Age': '86400',
                 },
             });
         }
 
         if (request.method !== 'POST') {
-            return new Response('Method not allowed', { status: 405 });
+            return new Response('NovelForge Proxy is running. Send POST requests with X-Target-URL header.', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' },
+            });
         }
 
-        // Forward the request to NVIDIA NIM
-        const nvidiaRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': request.headers.get('Authorization') || '',
-            },
-            body: request.body,
-        });
+        // Get the target URL from the header
+        const targetUrl = request.headers.get('X-Target-URL');
+        if (!targetUrl) {
+            return new Response(JSON.stringify({ error: { message: 'Missing X-Target-URL header' } }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+        }
 
-        // Forward the response back with CORS headers
-        const responseBody = await nvidiaRes.text();
-        return new Response(responseBody, {
-            status: nvidiaRes.status,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-        });
+        try {
+            // Forward the request to the target API
+            const apiRes = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': request.headers.get('Authorization') || '',
+                },
+                body: request.body,
+            });
+
+            // Forward the response back with CORS headers
+            const responseBody = await apiRes.text();
+            return new Response(responseBody, {
+                status: apiRes.status,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        } catch (err) {
+            return new Response(JSON.stringify({ error: { message: 'Proxy error: ' + err.message } }), {
+                status: 502,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+        }
     },
 };
