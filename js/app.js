@@ -355,8 +355,9 @@ class NovelApp {
             headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
-                'X-Target-URL': targetUrl,
             };
+            // Pass target URL inside the body for the proxy
+            bodyObj._proxyTarget = targetUrl;
         }
 
         const res = await fetch(fetchUrl, {
