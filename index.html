@@ -9,7 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=4">
+    <link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 
 <body>
@@ -155,62 +155,72 @@
                     <p class="panel-desc">API configuration and system prompts.</p>
                 </div>
 
+                <!-- ====== ACTIVE PROFILES ====== -->
                 <div class="form-group">
-                    <label>🌐 API Provider</label>
-                    <div class="provider-toggle">
-                        <button id="provOpenRouter" class="provider-btn active" onclick="app.switchProvider('openrouter')">OpenRouter</button>
-                        <button id="provNvidia" class="provider-btn" onclick="app.switchProvider('nvidia')">NVIDIA NIM</button>
-                        <button id="provCustom" class="provider-btn" onclick="app.switchProvider('custom')">Custom API</button>
+                    <label>✍️ Writing Model</label>
+                    <select id="writeProfile" class="input-field" onchange="app.data.activeWriteProfile=this.value;app.save()">
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>📋 Summary Model</label>
+                    <p class="field-hint">Uses a cheaper/free model for auto-summarization to save costs.</p>
+                    <select id="summaryProfile" class="input-field" onchange="app.data.activeSummaryProfile=this.value;app.save()">
+                    </select>
+                </div>
+
+                <hr class="divider">
+
+                <!-- ====== SAVED PROFILES ====== -->
+                <div class="form-group">
+                    <label>🗂️ API Profiles</label>
+                    <p class="field-hint">Save multiple API configs. Pick one for writing, another for summary.</p>
+                </div>
+                <div id="profileCards"></div>
+                <button class="btn btn-secondary btn-full" style="margin-bottom:1rem" onclick="app.showProfileEditor()">
+                    ➕ Add New Profile
+                </button>
+
+                <!-- Profile Editor (hidden by default) -->
+                <div id="profileEditor" class="profile-editor hidden">
+                    <h3 id="profileEditorTitle">New Profile</h3>
+                    <input type="hidden" id="peId">
+                    <div class="form-group">
+                        <label>📛 Profile Name</label>
+                        <input type="text" id="peName" class="input-field" placeholder="e.g. Novita DeepSeek Pro">
+                    </div>
+                    <div class="form-group">
+                        <label>🌐 Provider</label>
+                        <select id="peProvider" class="input-field" onchange="app.onProfileProviderChange()">
+                            <option value="openrouter">OpenRouter (direct, no proxy)</option>
+                            <option value="nvidia">NVIDIA NIM (needs proxy)</option>
+                            <option value="custom">Custom API (needs proxy)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🔑 API Key</label>
+                        <input type="password" id="peKey" class="input-field" placeholder="your-api-key">
+                    </div>
+                    <div id="peBaseUrlGroup" class="form-group hidden">
+                        <label>🔗 API Base URL</label>
+                        <input type="text" id="peBaseUrl" class="input-field" placeholder="https://api.novita.ai/v3/openai">
+                    </div>
+                    <div id="peProxyGroup" class="form-group hidden">
+                        <label>🔗 CORS Proxy URL</label>
+                        <input type="text" id="peProxy" class="input-field" placeholder="https://novelforge-proxy.novelforge.workers.dev">
+                    </div>
+                    <div class="form-group">
+                        <label>🤖 Model</label>
+                        <input type="text" id="peModel" class="input-field" placeholder="deepseek/deepseek-v4-flash:free">
+                    </div>
+                    <div class="controls-row buttons-row">
+                        <button class="btn btn-primary" onclick="app.saveProfile()">💾 Save Profile</button>
+                        <button class="btn btn-ghost" onclick="app.hideProfileEditor()">Cancel</button>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label id="apiKeyLabel">🔑 OpenRouter API Key</label>
-                    <input type="password" id="apiKey" class="input-field" placeholder="sk-or-v1-xxxxxxxxxxxx">
-                </div>
+                <hr class="divider">
 
-                <!-- Custom API: Base URL -->
-                <div id="customBaseUrlGroup" class="form-group hidden">
-                    <label>🔗 API Base URL</label>
-                    <p class="field-hint">The OpenAI-compatible endpoint (e.g. https://api.novita.ai/v3/openai)</p>
-                    <input type="text" id="customBaseUrl" class="input-field" placeholder="https://api.novita.ai/v3/openai/chat/completions">
-                </div>
-
-                <!-- Proxy URL (NVIDIA + Custom) -->
-                <div id="proxyUrlGroup" class="form-group hidden">
-                    <label>🔗 CORS Proxy URL</label>
-                    <p class="field-hint">Required for mobile. Your Cloudflare Worker URL that bypasses CORS.</p>
-                    <input type="text" id="proxyUrl" class="input-field" placeholder="https://novelforge-proxy.novelforge.workers.dev">
-                </div>
-
-                <div class="form-group">
-                    <label>🤖 Model</label>
-                    <!-- Model dropdown (hidden for Custom provider) -->
-                    <select id="modelSelect" class="input-field">
-                        <!-- OpenRouter models -->
-                        <optgroup id="ogOpenRouter" label="OpenRouter">
-                            <option value="deepseek/deepseek-v4-flash:free" selected>⭐ DeepSeek V4 Flash (Free)</option>
-                            <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash (Paid)</option>
-                            <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro (Paid)</option>
-                            <option value="deepseek/deepseek-chat">DeepSeek V3 (Legacy)</option>
-                            <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek V3 Free (Legacy)</option>
-                            <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</option>
-                            <option value="google/gemini-2.5-flash-preview">Gemini 2.5 Flash</option>
-                            <option value="google/gemini-2.5-pro-preview">Gemini 2.5 Pro</option>
-                            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
-                        </optgroup>
-                        <!-- NVIDIA NIM models -->
-                        <optgroup id="ogNvidia" label="NVIDIA NIM" class="hidden">
-                            <option value="deepseek-ai/deepseek-v4-pro">⭐ DeepSeek V4 Pro</option>
-                            <option value="deepseek-ai/deepseek-v4-flash">DeepSeek V4 Flash</option>
-                            <option value="deepseek-ai/deepseek-r1">DeepSeek R1</option>
-                            <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B</option>
-                        </optgroup>
-                    </select>
-                    <!-- Custom model name (shown for Custom provider) -->
-                    <input type="text" id="customModel" class="input-field hidden" placeholder="deepseek-ai/deepseek-v4-pro">
-                </div>
-
+                <!-- ====== GLOBAL SETTINGS ====== -->
                 <div class="form-group">
                     <label>🔓 System Prompt / JB</label>
                     <p class="field-hint">Your jailbreak or system instruction. Sent as the first system message.</p>
@@ -229,8 +239,8 @@
                     <span id="tempValue" class="range-value">0.8</span>
                 </div>
 
-                <button class="btn btn-primary btn-full" onclick="app.saveSettings()">
-                    💾 Save Settings
+                <button class="btn btn-primary btn-full" onclick="app.saveGlobalSettings()">
+                    💾 Save Global Settings
                 </button>
 
                 <hr class="divider">
@@ -260,7 +270,7 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=4"></script>
+    <script src="js/app.js?v=5"></script>
 </body>
 
 </html>

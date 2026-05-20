@@ -1,5 +1,5 @@
 /* =============================================
-   NovelForge — Main App Logic
+   NovelForge — Main App Logic (v5 - Profiles)
    ============================================= */
 
 class NovelApp {
@@ -12,17 +12,17 @@ class NovelApp {
     /* ---------- STORAGE ---------- */
     defaults() {
         return {
-            provider: 'openrouter',
-            apiKey: '',
-            apiKeyNvidia: '',
-            apiKeyCustom: '',
-            proxyUrl: '',
-            customBaseUrl: '',
-            model: 'deepseek/deepseek-v4-flash:free',
-            customModel: '',
+            // Profiles system
+            apiProfiles: [
+                { id: 'or-free', name: 'OpenRouter Free', provider: 'openrouter', apiKey: '', model: 'deepseek/deepseek-v4-flash:free', baseUrl: '', proxyUrl: '' },
+            ],
+            activeWriteProfile: 'or-free',
+            activeSummaryProfile: 'or-free',
+            // Global settings
             jbPrompt: '',
             maxTokens: 8192,
             temperature: 0.8,
+            // World
             characters: '',
             worldSetting: '',
             writingStyle: '',
@@ -34,7 +34,17 @@ class NovelApp {
     load() {
         try {
             const saved = localStorage.getItem('novelforge');
-            return saved ? { ...this.defaults(), ...JSON.parse(saved) } : this.defaults();
+            if (!saved) return this.defaults();
+            const parsed = { ...this.defaults(), ...JSON.parse(saved) };
+            // Migration: if old format (no apiProfiles), create profiles from old data
+            if (!parsed.apiProfiles || parsed.apiProfiles.length === 0) {
+                parsed.apiProfiles = this.defaults().apiProfiles;
+                // Migrate old API key if present
+                if (parsed.apiKey) {
+                    parsed.apiProfiles[0].apiKey = parsed.apiKey;
+                }
+            }
+            return parsed;
         } catch { return this.defaults(); }
     }
 
@@ -42,96 +52,179 @@ class NovelApp {
         localStorage.setItem('novelforge', JSON.stringify(this.data));
     }
 
+    /* ---------- PROFILE HELPERS ---------- */
+    getProfile(id) {
+        return this.data.apiProfiles.find(p => p.id === id);
+    }
+
+    getWriteProfile() {
+        return this.getProfile(this.data.activeWriteProfile) || this.data.apiProfiles[0];
+    }
+
+    getSummaryProfile() {
+        return this.getProfile(this.data.activeSummaryProfile) || this.data.apiProfiles[0];
+    }
+
     /* ---------- INIT ---------- */
     init() {
-        // Provider toggle
-        this.switchProvider(this.data.provider, true);
+        // Populate profile dropdowns
+        this.renderProfileDropdowns();
+        this.renderProfileCards();
 
-        document.getElementById('modelSelect').value = this.data.model;
-        document.getElementById('customModel').value = this.data.customModel;
+        // Global settings
         document.getElementById('jbPrompt').value = this.data.jbPrompt;
         document.getElementById('maxTokens').value = this.data.maxTokens;
         document.getElementById('temperature').value = this.data.temperature;
         document.getElementById('tempValue').textContent = this.data.temperature;
+
+        // World
         document.getElementById('worldCharacters').value = this.data.characters;
         document.getElementById('worldSetting').value = this.data.worldSetting;
         document.getElementById('worldStyle').value = this.data.writingStyle;
         document.getElementById('rollingSummary').value = this.data.rollingSummary;
 
-        if (this.data.model === 'custom') {
-            document.getElementById('customModel').classList.remove('hidden');
-        } else {
-            document.getElementById('customModel').classList.add('hidden');
-        }
-
         this.renderNovel();
         this.updateStats();
-    }
 
-    setupListeners() {
-        document.getElementById('modelSelect').addEventListener('change', (e) => {
-            document.getElementById('customModel').classList.toggle('hidden', e.target.value !== 'custom');
-        });
+        // Listeners
         document.getElementById('temperature').addEventListener('input', (e) => {
             document.getElementById('tempValue').textContent = e.target.value;
         });
     }
 
-    /* ---------- PROVIDER TOGGLE ---------- */
-    switchProvider(provider, silent) {
-        this.data.provider = provider;
-        const isNvidia = provider === 'nvidia';
-        const isCustom = provider === 'custom';
-        const isOpenRouter = provider === 'openrouter';
+    /* ---------- PROFILE UI ---------- */
+    renderProfileDropdowns() {
+        const writeSelect = document.getElementById('writeProfile');
+        const summarySelect = document.getElementById('summaryProfile');
+        const opts = this.data.apiProfiles.map(p => {
+            const icon = p.provider === 'openrouter' ? '⚡' : p.provider === 'nvidia' ? '🟢' : '🔗';
+            return `<option value="${p.id}">${icon} ${p.name} (${p.model})</option>`;
+        }).join('');
+        writeSelect.innerHTML = opts;
+        summarySelect.innerHTML = opts;
+        writeSelect.value = this.data.activeWriteProfile;
+        summarySelect.value = this.data.activeSummaryProfile;
+    }
 
-        // Toggle button styles
-        document.getElementById('provOpenRouter').classList.toggle('active', isOpenRouter);
-        document.getElementById('provNvidia').classList.toggle('active', isNvidia);
-        document.getElementById('provCustom').classList.toggle('active', isCustom);
+    renderProfileCards() {
+        const container = document.getElementById('profileCards');
+        if (this.data.apiProfiles.length === 0) {
+            container.innerHTML = '<p class="field-hint" style="text-align:center;padding:1rem">No profiles yet. Add one!</p>';
+            return;
+        }
+        container.innerHTML = this.data.apiProfiles.map(p => {
+            const icon = p.provider === 'openrouter' ? '⚡' : p.provider === 'nvidia' ? '🟢' : '🔗';
+            const isWrite = p.id === this.data.activeWriteProfile;
+            const isSummary = p.id === this.data.activeSummaryProfile;
+            const badges = [];
+            if (isWrite) badges.push('<span class="badge badge-write">✍️ Write</span>');
+            if (isSummary) badges.push('<span class="badge badge-summary">📋 Summary</span>');
+            const keyPreview = p.apiKey ? '••••' + p.apiKey.slice(-4) : '⚠️ No key';
+            return `
+                <div class="profile-card">
+                    <div class="pc-header">
+                        <span class="pc-icon">${icon}</span>
+                        <span class="pc-name">${p.name}</span>
+                        ${badges.join('')}
+                    </div>
+                    <div class="pc-details">
+                        <span class="pc-model">${p.model}</span>
+                        <span class="pc-key">${keyPreview}</span>
+                    </div>
+                    <div class="pc-actions">
+                        <button class="btn btn-ghost btn-sm" onclick="app.editProfile('${p.id}')">✏️ Edit</button>
+                        <button class="btn btn-ghost btn-sm" onclick="app.deleteProfile('${p.id}')" ${this.data.apiProfiles.length <= 1 ? 'disabled' : ''}>🗑️</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
 
-        // Update API key field
-        const keyField = document.getElementById('apiKey');
-        const keyLabel = document.getElementById('apiKeyLabel');
-        if (isNvidia) {
-            keyLabel.textContent = '🔑 NVIDIA API Key';
-            keyField.placeholder = 'nvapi-xxxxxxxxxxxx';
-            keyField.value = this.data.apiKeyNvidia;
-        } else if (isCustom) {
-            keyLabel.textContent = '🔑 API Key';
-            keyField.placeholder = 'your-api-key-here';
-            keyField.value = this.data.apiKeyCustom;
+    showProfileEditor(profileId) {
+        const editor = document.getElementById('profileEditor');
+        editor.classList.remove('hidden');
+        if (profileId) {
+            const p = this.getProfile(profileId);
+            document.getElementById('profileEditorTitle').textContent = 'Edit Profile';
+            document.getElementById('peId').value = p.id;
+            document.getElementById('peName').value = p.name;
+            document.getElementById('peProvider').value = p.provider;
+            document.getElementById('peKey').value = p.apiKey;
+            document.getElementById('peBaseUrl').value = p.baseUrl || '';
+            document.getElementById('peProxy').value = p.proxyUrl || '';
+            document.getElementById('peModel').value = p.model;
         } else {
-            keyLabel.textContent = '🔑 OpenRouter API Key';
-            keyField.placeholder = 'sk-or-v1-xxxxxxxxxxxx';
-            keyField.value = this.data.apiKey;
+            document.getElementById('profileEditorTitle').textContent = 'New Profile';
+            document.getElementById('peId').value = '';
+            document.getElementById('peName').value = '';
+            document.getElementById('peProvider').value = 'openrouter';
+            document.getElementById('peKey').value = '';
+            document.getElementById('peBaseUrl').value = '';
+            document.getElementById('peProxy').value = '';
+            document.getElementById('peModel').value = '';
+        }
+        this.onProfileProviderChange();
+    }
+
+    hideProfileEditor() {
+        document.getElementById('profileEditor').classList.add('hidden');
+    }
+
+    editProfile(id) {
+        this.showProfileEditor(id);
+    }
+
+    deleteProfile(id) {
+        if (this.data.apiProfiles.length <= 1) return;
+        this.data.apiProfiles = this.data.apiProfiles.filter(p => p.id !== id);
+        // Fix active selections if deleted
+        if (this.data.activeWriteProfile === id) this.data.activeWriteProfile = this.data.apiProfiles[0].id;
+        if (this.data.activeSummaryProfile === id) this.data.activeSummaryProfile = this.data.apiProfiles[0].id;
+        this.save();
+        this.renderProfileCards();
+        this.renderProfileDropdowns();
+        this.toast('Profile deleted');
+    }
+
+    onProfileProviderChange() {
+        const provider = document.getElementById('peProvider').value;
+        const needsProxy = provider !== 'openrouter';
+        const needsBaseUrl = provider === 'custom';
+        document.getElementById('peBaseUrlGroup').classList.toggle('hidden', !needsBaseUrl);
+        document.getElementById('peProxyGroup').classList.toggle('hidden', !needsProxy);
+    }
+
+    saveProfile() {
+        const name = document.getElementById('peName').value.trim();
+        const provider = document.getElementById('peProvider').value;
+        const apiKey = document.getElementById('peKey').value.trim();
+        const model = document.getElementById('peModel').value.trim();
+        const baseUrl = document.getElementById('peBaseUrl').value.trim();
+        const proxyUrl = document.getElementById('peProxy').value.trim();
+
+        if (!name || !model) {
+            this.toast('Name and Model are required!');
+            return;
         }
 
-        // Show/hide custom base URL field
-        document.getElementById('customBaseUrlGroup').classList.toggle('hidden', !isCustom);
-        if (isCustom) {
-            document.getElementById('customBaseUrl').value = this.data.customBaseUrl;
+        const existingId = document.getElementById('peId').value;
+        if (existingId) {
+            // Update existing
+            const p = this.getProfile(existingId);
+            if (p) {
+                p.name = name; p.provider = provider; p.apiKey = apiKey;
+                p.model = model; p.baseUrl = baseUrl; p.proxyUrl = proxyUrl;
+            }
+        } else {
+            // Create new
+            const id = 'p_' + Date.now();
+            this.data.apiProfiles.push({ id, name, provider, apiKey, model, baseUrl, proxyUrl });
         }
 
-        // Show/hide proxy URL field (NVIDIA + Custom need it)
-        document.getElementById('proxyUrlGroup').classList.toggle('hidden', isOpenRouter);
-        if (!isOpenRouter) {
-            document.getElementById('proxyUrl').value = this.data.proxyUrl;
-        }
-
-        // Toggle model optgroups vs custom model input
-        document.getElementById('ogOpenRouter').classList.toggle('hidden', !isOpenRouter);
-        document.getElementById('ogNvidia').classList.toggle('hidden', !isNvidia);
-        document.getElementById('modelSelect').classList.toggle('hidden', isCustom);
-        document.getElementById('customModel').classList.toggle('hidden', !isCustom);
-        if (isCustom) {
-            document.getElementById('customModel').value = this.data.customModel;
-        }
-
-        // Auto-select first model of the active provider
-        if (!silent && !isCustom) {
-            const firstOption = document.querySelector(`#${isNvidia ? 'ogNvidia' : 'ogOpenRouter'} option`);
-            if (firstOption) document.getElementById('modelSelect').value = firstOption.value;
-        }
+        this.save();
+        this.hideProfileEditor();
+        this.renderProfileCards();
+        this.renderProfileDropdowns();
+        this.toast('Profile saved ✓');
     }
 
     /* ---------- TABS ---------- */
@@ -143,30 +236,12 @@ class NovelApp {
     }
 
     /* ---------- SAVE HANDLERS ---------- */
-    saveSettings() {
-        const provider = this.data.provider;
-        const keyVal = document.getElementById('apiKey').value.trim();
-        if (provider === 'nvidia') {
-            this.data.apiKeyNvidia = keyVal;
-        } else if (provider === 'custom') {
-            this.data.apiKeyCustom = keyVal;
-            this.data.customBaseUrl = document.getElementById('customBaseUrl').value.trim();
-            this.data.customModel = document.getElementById('customModel').value.trim();
-        } else {
-            this.data.apiKey = keyVal;
-        }
-        // Proxy URL shared by NVIDIA + Custom
-        if (provider !== 'openrouter') {
-            this.data.proxyUrl = document.getElementById('proxyUrl').value.trim();
-        }
-        if (provider !== 'custom') {
-            this.data.model = document.getElementById('modelSelect').value;
-        }
+    saveGlobalSettings() {
         this.data.jbPrompt = document.getElementById('jbPrompt').value;
         this.data.maxTokens = parseInt(document.getElementById('maxTokens').value) || 8192;
         this.data.temperature = parseFloat(document.getElementById('temperature').value) || 0.8;
         this.save();
-        this.toast('Settings saved ✓');
+        this.toast('Global settings saved ✓');
     }
 
     saveWorld() {
@@ -223,7 +298,6 @@ class NovelApp {
                 let block = '';
                 if (s.direction) block += `[Scene direction: ${s.direction}]\n`;
                 let text = s.text;
-                // Truncate long sections — keep last 2000 chars
                 if (text.length > 2000) {
                     text = '... [earlier content truncated] ...\n\n' + text.slice(-2000);
                 }
@@ -241,10 +315,9 @@ class NovelApp {
     /* ---------- GENERATION ---------- */
     async generate(mode) {
         if (this.generating) return;
-        const p = this.data.provider;
-        const activeKey = p === 'nvidia' ? this.data.apiKeyNvidia : p === 'custom' ? this.data.apiKeyCustom : this.data.apiKey;
-        if (!activeKey) {
-            this.toast('Set your API key in ⚙️ Settings!');
+        const profile = this.getWriteProfile();
+        if (!profile || !profile.apiKey) {
+            this.toast('Set an API key in your writing profile! ⚙️');
             this.switchTab('settings');
             return;
         }
@@ -259,7 +332,6 @@ class NovelApp {
                 ? `Begin the novel with this scene: ${sceneInput}\n\nWrite the opening section.`
                 : 'Begin the novel. Write the opening section — Day 1.';
         } else {
-            // Smarter continue prompt that pushes plot forward
             const sectionCount = this.data.novelSections.length;
             userMsg = sceneInput
                 ? `Continue the novel. Direction: ${sceneInput}\n\nDo NOT repeat any previous scenes. Introduce new events and conversations.`
@@ -268,12 +340,11 @@ class NovelApp {
 
         const messages = this.buildMessages(userMsg);
         this.generating = true;
-        this.setGenStatus(true, 'Generating...');
+        this.setGenStatus(true, 'Writing...');
         this.disableControls(true);
 
         try {
-            const model = this.data.model === 'custom' ? this.data.customModel : this.data.model;
-            const response = await this.callAPI(messages, model);
+            const response = await this.callAPIWithProfile(messages, profile);
 
             if (response) {
                 this.data.novelSections.push({
@@ -288,9 +359,12 @@ class NovelApp {
                 // Auto-save response to file
                 this.autoSaveResponse(response, this.data.novelSections.length);
 
-                // Auto-summarize using same model
-                this.setGenStatus(true, 'Summarizing...');
-                await this.autoSummarize(response, model);
+                // Auto-summarize using SUMMARY profile (cheaper model)
+                const summaryProfile = this.getSummaryProfile();
+                if (summaryProfile && summaryProfile.apiKey) {
+                    this.setGenStatus(true, 'Summarizing...');
+                    await this.autoSummarize(response, summaryProfile);
+                }
 
                 this.updateStats();
                 this.toast('Section generated ✓');
@@ -305,35 +379,28 @@ class NovelApp {
         }
     }
 
-    async callAPI(messages, model) {
-        const provider = this.data.provider;
-        let targetUrl, apiKey;
+    async callAPIWithProfile(messages, profile) {
+        const provider = profile.provider;
+        let targetUrl;
 
         if (provider === 'nvidia') {
             targetUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
-            apiKey = this.data.apiKeyNvidia;
         } else if (provider === 'custom') {
-            targetUrl = this.data.customBaseUrl;
-            apiKey = this.data.apiKeyCustom;
-            model = this.data.customModel || model;
-            if (!targetUrl) throw new Error('Set your Custom API Base URL in Settings!');
-            // Ensure URL ends with /chat/completions
+            targetUrl = profile.baseUrl;
+            if (!targetUrl) throw new Error('Set Base URL in your profile!');
             if (!targetUrl.includes('/chat/completions')) {
                 targetUrl = targetUrl.replace(/\/$/, '') + '/chat/completions';
             }
         } else {
-            // OpenRouter — direct, no proxy needed
             targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
-            apiKey = this.data.apiKey;
         }
 
         const bodyObj = {
-            model: model,
+            model: profile.model,
             messages: messages,
             max_tokens: this.data.maxTokens,
             temperature: this.data.temperature,
         };
-        // NVIDIA NIM: enable thinking to prevent timeout
         if (provider === 'nvidia') {
             bodyObj.chat_template_kwargs = { enable_thinking: true, thinking: true };
         }
@@ -341,22 +408,21 @@ class NovelApp {
         let fetchUrl, headers;
 
         if (provider === 'openrouter') {
-            // Direct call — OpenRouter supports CORS
             fetchUrl = targetUrl;
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${profile.apiKey}`,
                 'HTTP-Referer': window.location.href,
                 'X-Title': 'NovelForge',
             };
         } else {
-            // Route through proxy (local or Cloudflare Worker)
-            fetchUrl = this.data.proxyUrl || '/proxy/nvidia';
+            // Route through CORS proxy
+            fetchUrl = profile.proxyUrl;
+            if (!fetchUrl) throw new Error('Set CORS Proxy URL in your profile for non-OpenRouter providers!');
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${profile.apiKey}`,
             };
-            // Pass target URL inside the body for the proxy
             bodyObj._proxyTarget = targetUrl;
         }
 
@@ -375,7 +441,7 @@ class NovelApp {
         return data.choices?.[0]?.message?.content || '';
     }
 
-    /* ---------- AUTO-SAVE RESPONSE TO FILE ---------- */
+    /* ---------- AUTO-SAVE ---------- */
     autoSaveResponse(text, sectionNum) {
         try {
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
@@ -392,7 +458,7 @@ class NovelApp {
     }
 
     /* ---------- AUTO-SUMMARIZE ---------- */
-    async autoSummarize(newText, model) {
+    async autoSummarize(newText, summaryProfile) {
         try {
             const summaryPrompt = [
                 {
@@ -405,7 +471,7 @@ class NovelApp {
                 }
             ];
 
-            const summary = await this.callAPI(summaryPrompt, model);
+            const summary = await this.callAPIWithProfile(summaryPrompt, summaryProfile);
             if (summary) {
                 const sectionNum = this.data.novelSections.length;
                 const newEntry = `\n\n[Section ${sectionNum}] ${summary.trim()}`;
@@ -419,171 +485,46 @@ class NovelApp {
     }
 
     /* ---------- RENDER NOVEL ---------- */
-    parseMd(text) {
-        // Parse markdown: **bold**, *italic*, escape HTML first
-        let safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // Bold: **text**
-        safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        // Italic: *text*
-        safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        // Horizontal rules: --- or ***
-        safe = safe.replace(/^(---|\*\*\*)$/gm, '<hr>');
-        return safe;
-    }
-
     renderNovel() {
         const output = document.getElementById('novelOutput');
         if (this.data.novelSections.length === 0) {
-            output.innerHTML = `<div class="novel-empty">
-                <div class="empty-icon">📖</div>
-                <h3>Your Novel Starts Here</h3>
-                <p>Set up your world in the 🌍 World tab, then come back and start writing!</p>
-            </div>`;
+            output.innerHTML = `
+                <div class="novel-empty">
+                    <div class="empty-icon">📖</div>
+                    <h3>Your Novel Starts Here</h3>
+                    <p>Set up your world in the 🌍 World tab, then come back and start writing!</p>
+                </div>`;
             return;
         }
 
         output.innerHTML = this.data.novelSections.map((s, i) => {
-            const dir = s.direction ? `<div class="section-direction">🎬 ${s.direction}</div>` : '';
-            const meta = `<div class="section-meta">Section ${i + 1}</div>`;
-            const text = s.text.split('\n').filter(p => p.trim()).map(p => `<p>${this.parseMd(p)}</p>`).join('');
-            return `<div class="novel-section">${meta}${dir}${text}</div>`;
+            const date = new Date(s.timestamp).toLocaleDateString();
+            const parsedText = this.parseMd(s.text);
+            return `
+                <div class="novel-section">
+                    <div class="section-meta">Section ${i + 1} · ${date}</div>
+                    ${s.direction ? `<div class="section-direction">🎬 ${s.direction}</div>` : ''}
+                    ${parsedText}
+                </div>`;
         }).join('');
 
         output.scrollTop = output.scrollHeight;
     }
 
-    /* ---------- UNDO ---------- */
-    undoLast() {
-        if (this.data.novelSections.length === 0) return;
-        if (!confirm('Remove the last generated section?')) return;
-        this.data.novelSections.pop();
-        const lines = this.data.rollingSummary.split(/\n\n\[Section/);
-        if (lines.length > 1) {
-            lines.pop();
-            this.data.rollingSummary = lines.join('\n\n[Section').trim();
-            document.getElementById('rollingSummary').value = this.data.rollingSummary;
-        }
-        this.save();
-        this.renderNovel();
-        this.updateStats();
-        this.toast('Last section removed');
-    }
-
-    /* ---------- EXPORT / IMPORT ---------- */
-    exportNovel() {
-        if (this.data.novelSections.length === 0) { this.toast('Nothing to export'); return; }
-        const text = this.data.novelSections.map((s, i) => {
-            let block = `--- Section ${i + 1} ---\n`;
-            if (s.direction) block += `[Direction: ${s.direction}]\n\n`;
-            block += s.text;
-            return block;
-        }).join('\n\n\n');
-        this.downloadFile('novel_full.txt', text);
-    }
-
-    exportAll() {
-        this.downloadFile('novelforge_backup.json', JSON.stringify(this.data, null, 2));
-    }
-
-    importAll(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const imported = JSON.parse(e.target.result);
-                this.data = { ...this.defaults(), ...imported };
-                this.save();
-                this.init();
-                this.toast('Project imported ✓');
-            } catch { this.toast('Invalid file'); }
-        };
-        reader.readAsText(file);
-        event.target.value = ''; // reset file input
-    }
-
-    downloadFile(name, content) {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
-    }
-
-    /* ---------- CLEAR (FIXED) ---------- */
-    clearNovel() {
-        // Double-click safety instead of confirm()
-        if (!this._clearNovelPending) {
-            this._clearNovelPending = true;
-            this.toast('Click again to confirm clear');
-            setTimeout(() => { this._clearNovelPending = false; }, 3000);
-            return;
-        }
-        this._clearNovelPending = false;
-        this.data.novelSections = [];
-        this.data.rollingSummary = '';
-        document.getElementById('rollingSummary').value = '';
-        this.save();
-        this.renderNovel();
-        this.updateStats();
-        this.switchTab('novel');
-        this.toast('Novel cleared ✓');
-    }
-
-    clearAll() {
-        if (!this._clearAllPending) {
-            this._clearAllPending = true;
-            this.toast('⚠️ Click again to DELETE EVERYTHING');
-            setTimeout(() => { this._clearAllPending = false; }, 3000);
-            return;
-        }
-        this._clearAllPending = false;
-        localStorage.removeItem('novelforge');
-        this.data = this.defaults();
-        // Reset all form fields manually
-        document.getElementById('apiKey').value = '';
-        document.getElementById('modelSelect').value = 'deepseek/deepseek-chat';
-        document.getElementById('customModel').value = '';
-        document.getElementById('customModel').classList.add('hidden');
-        document.getElementById('jbPrompt').value = '';
-        document.getElementById('maxTokens').value = 4096;
-        document.getElementById('temperature').value = 0.8;
-        document.getElementById('tempValue').textContent = '0.8';
-        document.getElementById('worldCharacters').value = '';
-        document.getElementById('worldSetting').value = '';
-        document.getElementById('worldStyle').value = '';
-        document.getElementById('rollingSummary').value = '';
-        document.getElementById('sceneInput').value = '';
-        this.save();
-        this.renderNovel();
-        this.updateStats();
-        this.switchTab('novel');
-        this.toast('Everything reset ✓');
-    }
-
-    /* ---------- CONTEXT PREVIEW ---------- */
-    previewContext() {
-        const msgs = this.buildMessages('[user message would go here]');
-        const preview = document.getElementById('contextPreview');
-        preview.classList.toggle('hidden');
-        if (!preview.classList.contains('hidden')) {
-            preview.textContent = msgs.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n' + '─'.repeat(40) + '\n\n');
-        }
-    }
-
-    /* ---------- STATS ---------- */
-    updateStats() {
-        const totalWords = this.data.novelSections.reduce((sum, s) => sum + s.text.split(/\s+/).length, 0);
-        const sections = this.data.novelSections.length;
-        const contextChars = (this.data.characters + this.data.worldSetting + this.data.writingStyle + this.data.rollingSummary + this.data.jbPrompt).length;
-        const estTokens = Math.round(contextChars / 4);
-
-        document.getElementById('statNovelWords').textContent = totalWords.toLocaleString() + ' words';
-        document.getElementById('statChapters').textContent = sections;
-        document.getElementById('statContext').textContent = `~${estTokens.toLocaleString()} tokens`;
+    parseMd(text) {
+        return text
+            .split('\n\n')
+            .map(para => {
+                let p = para.trim();
+                if (!p) return '';
+                if (p.startsWith('---')) return '<hr>';
+                // Bold & italic
+                p = p.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+                p = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                p = p.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                return `<p>${p}</p>`;
+            })
+            .join('');
     }
 
     /* ---------- UI HELPERS ---------- */
@@ -599,20 +540,114 @@ class NovelApp {
     }
 
     toast(msg) {
-        const existing = document.querySelector('.toast');
-        if (existing) existing.remove();
         const el = document.createElement('div');
         el.className = 'toast';
         el.textContent = msg;
-        el.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
-            padding:0.6rem 1.2rem;background:rgba(20,20,42,0.95);color:#e4e2f0;
-            font-size:0.82rem;font-weight:600;border-radius:8px;z-index:999;
-            border:1px solid rgba(167,139,250,0.3);box-shadow:0 4px 16px rgba(0,0,0,0.4);
-            animation:fadeIn 0.3s ease;white-space:nowrap;`;
         document.body.appendChild(el);
-        setTimeout(() => el.remove(), 2500);
+        setTimeout(() => el.classList.add('visible'), 10);
+        setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, 2500);
+    }
+
+    undoLast() {
+        if (this.data.novelSections.length === 0) return;
+        this.data.novelSections.pop();
+        this.save();
+        this.renderNovel();
+        this.updateStats();
+        this.toast('Last section removed');
+    }
+
+    /* ---------- STATS ---------- */
+    updateStats() {
+        const totalWords = this.data.novelSections.reduce((sum, s) => sum + s.text.split(/\s+/).length, 0);
+        document.getElementById('statNovelWords').textContent = totalWords.toLocaleString() + ' words';
+        document.getElementById('statChapters').textContent = this.data.novelSections.length;
+
+        const contextSize = (this.data.characters + this.data.worldSetting + this.data.writingStyle + this.data.rollingSummary).length;
+        document.getElementById('statContext').textContent = `~${Math.round(contextSize / 4).toLocaleString()} tokens`;
+    }
+
+    previewContext() {
+        const preview = document.getElementById('contextPreview');
+        preview.classList.toggle('hidden');
+        if (!preview.classList.contains('hidden')) {
+            const msgs = this.buildMessages('[Your next prompt here]');
+            preview.textContent = msgs.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n---\n\n');
+        }
+    }
+
+    /* ---------- EXPORT / IMPORT ---------- */
+    exportNovel() {
+        const text = this.data.novelSections.map((s, i) => {
+            let block = `=== Section ${i + 1} ===\n`;
+            if (s.direction) block += `Direction: ${s.direction}\n`;
+            block += `\n${s.text}\n`;
+            return block;
+        }).join('\n\n');
+        this.downloadFile('novelforge_novel.txt', text, 'text/plain');
+    }
+
+    exportAll() {
+        this.downloadFile('novelforge_backup.json', JSON.stringify(this.data, null, 2), 'application/json');
+    }
+
+    importAll(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const imported = JSON.parse(e.target.result);
+                this.data = { ...this.defaults(), ...imported };
+                this.save();
+                this.init();
+                this.toast('Project imported ✓');
+            } catch { this.toast('Invalid JSON file'); }
+        };
+        reader.readAsText(file);
+    }
+
+    downloadFile(name, content, type) {
+        const blob = new Blob([content], { type });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    /* ---------- CLEAR ---------- */
+    clearNovel() {
+        if (!this._clearNovelConfirm) {
+            this._clearNovelConfirm = true;
+            this.toast('Tap again to confirm clear');
+            setTimeout(() => this._clearNovelConfirm = false, 3000);
+            return;
+        }
+        this.data.novelSections = [];
+        this.data.rollingSummary = '';
+        document.getElementById('rollingSummary').value = '';
+        this.save();
+        this.renderNovel();
+        this.updateStats();
+        this.toast('Novel cleared');
+        this._clearNovelConfirm = false;
+    }
+
+    clearAll() {
+        if (!this._clearAllConfirm) {
+            this._clearAllConfirm = true;
+            this.toast('Tap again to confirm FULL reset');
+            setTimeout(() => this._clearAllConfirm = false, 3000);
+            return;
+        }
+        this.data = this.defaults();
+        this.save();
+        this.init();
+        this.toast('Everything reset');
+        this._clearAllConfirm = false;
     }
 }
 
+// Boot
 const app = new NovelApp();
-app.setupListeners();
