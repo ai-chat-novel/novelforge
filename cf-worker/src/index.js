@@ -1,8 +1,6 @@
-// NovelForge — Universal API Proxy (Cloudflare Worker)
-// Proxies any OpenAI-compatible API to bypass CORS
-// Target URL is passed in the request body as "_proxyTarget"
+// NovelForge — Universal Streaming API Proxy (Cloudflare Worker)
+// Streams responses to avoid 524 timeouts on slow models
 // Deploy: npx wrangler deploy --config cf-worker/wrangler.toml
-// Free tier: 100K requests/day
 
 export default {
     async fetch(request) {
@@ -15,25 +13,24 @@ export default {
         }
 
         if (request.method !== 'POST') {
-            return new Response('NovelForge Proxy is running. Send POST with _proxyTarget in body.', {
+            return new Response('NovelForge Proxy running. Send POST with _proxyTarget in body.', {
                 status: 200,
                 headers: { 'Content-Type': 'text/plain', ...corsHeaders() },
             });
         }
 
         try {
-            // Parse the body
             const body = await request.json();
-
-            // Extract and remove the proxy target from the body
             const targetUrl = body._proxyTarget;
             delete body._proxyTarget;
 
             if (!targetUrl) {
-                return jsonResponse(400, { error: { message: 'Missing _proxyTarget in request body' } });
+                return jsonRes(400, { error: { message: 'Missing _proxyTarget in body' } });
             }
 
-            // Forward the cleaned request to the target API
+            // Force streaming to prevent timeout on slow models
+            body.stream = true;
+
             const apiRes = await fetch(targetUrl, {
                 method: 'POST',
                 headers: {
@@ -43,14 +40,28 @@ export default {
                 body: JSON.stringify(body),
             });
 
-            // Forward the response back with CORS headers
-            const responseBody = await apiRes.text();
-            return new Response(responseBody, {
-                status: apiRes.status,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+            if (!apiRes.ok) {
+                // Non-2xx: forward error as-is
+                const errBody = await apiRes.text();
+                return new Response(errBody, {
+                    status: apiRes.status,
+                    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+                });
+            }
+
+            // Stream the SSE response directly to the client
+            return new Response(apiRes.body, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    ...corsHeaders(),
+                },
             });
+
         } catch (err) {
-            return jsonResponse(502, { error: { message: 'Proxy error: ' + err.message } });
+            return jsonRes(502, { error: { message: 'Proxy error: ' + err.message } });
         }
     },
 };
@@ -64,7 +75,7 @@ function corsHeaders() {
     };
 }
 
-function jsonResponse(status, obj) {
+function jsonRes(status, obj) {
     return new Response(JSON.stringify(obj), {
         status,
         headers: { 'Content-Type': 'application/json', ...corsHeaders() },
